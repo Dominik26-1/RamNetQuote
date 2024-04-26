@@ -1,0 +1,51 @@
+main:
+    params: [args]
+    steps:
+    - init:
+        assign:
+            - customHeader: ${args.header}
+            - quoteId: ${args.body.quoteId}
+    - getQuote:
+        call: http.get
+        args:
+            url: ${"https://us-central1-ramnetquote.cloudfunctions.net/dataDBService/quote/"+quoteId}
+            headers: 
+                tenant-id: ${customHeader.tenantId}
+                token-id: ${customHeader.tokenId}
+        result: QuoteData
+    - getQuotePDF:
+        call: http.get
+        args:
+            url: ${"https://us-central1-ramnetquote.cloudfunctions.net/pdfService/url/quote/"+QuoteData.body.pdfFileName}
+            headers: 
+                tenant-id: ${customHeader.tenantId}
+                token-id: ${customHeader.tokenId}
+        result: PDFQuote
+    - getCompanyData:
+        call: http.get
+        args:
+            url: ${"https://us-central1-ramnetquote.cloudfunctions.net/dataDBService/company/"+QuoteData.body.tenantId}
+            headers: 
+                tenant-id: ${customHeader.tenantId}
+                token-id: ${customHeader.tokenId}
+        result: CompanyData
+    - sendEmail:
+        call: http.post
+        args: 
+            url: https://us-central1-ramnetquote.cloudfunctions.net/emailSender/email
+            headers:
+                Content-Type: "application/json"
+                tenant-id: ${customHeader.tenantId}
+                token-id: ${customHeader.tokenId}
+            body: 
+                subject: ${CompanyData.body.subjectText}
+                text: ${CompanyData.body.emailText}
+                url: ${PDFQuote.body.url}
+                pdfFileName: ${QuoteData.body.pdfFileName}
+                to: ${QuoteData.body.customer.email}
+                quote: ${QuoteData.body}
+                companyName: ${CompanyData.body.name}
+        result: EmailResponse
+    - returnOutput:
+        return: ${EmailResponse.body}
+        

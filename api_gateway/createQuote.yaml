@@ -1,0 +1,56 @@
+main:
+    params: [args]
+    steps:
+    - init:
+        assign:
+            - customHeader: ${args.header}
+    - createQuote:
+        call: http.post
+        args:
+            url: https://us-central1-ramnetquote.cloudfunctions.net/dataDBService/quote
+            body: ${args.body}
+            headers: 
+                tenant-id: ${customHeader.tenantId}
+                token-id: ${customHeader.tokenId}
+        result: CreatedQuote
+    - getQuote:
+        call: http.get
+        args:
+            url: ${"https://us-central1-ramnetquote.cloudfunctions.net/dataDBService/quote/"+CreatedQuote.body.id}
+            headers: 
+                tenant-id: ${customHeader.tenantId}
+                token-id: ${customHeader.tokenId}
+        result: QuoteData
+    
+    - getPDFTemplate:
+        call: http.get
+        args:
+            url: ${"https://us-central1-ramnetquote.cloudfunctions.net/pdfService/url/template/"}
+            headers: 
+                tenant-id: ${customHeader.tenantId}
+                token-id: ${customHeader.tokenId}
+        result: PDFTemplate
+    - addDataToPDF:
+        call: http.post
+        args: 
+            url: https://us-central1-ramnetquote.cloudfunctions.net/pdfCreator/create-pdf
+            headers:
+                Content-Type: "application/json"
+                tenant-id: ${customHeader.tenantId}
+                token-id: ${customHeader.tokenId}
+            body: 
+                url: ${PDFTemplate.body.url}
+                quote: ${QuoteData.body}
+        result: PDFQuoteFile
+    - updateQuote:
+        call: http.put
+        args:
+            url: ${"https://us-central1-ramnetquote.cloudfunctions.net/dataDBService/quote/"+QuoteData.body.id}
+            body: 
+                pdfFileName: ${PDFQuoteFile.body.pdfFileName}
+            headers: 
+                tenant-id: ${customHeader.tenantId}
+                token-id: ${customHeader.tokenId}
+    - returnOutput:
+        return: ${CreatedQuote.body.id}
+        
